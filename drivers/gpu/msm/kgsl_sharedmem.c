@@ -617,16 +617,22 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 
 	while (len > 0) {
 		struct page *page;
-		unsigned int gfp_mask = GFP_KERNEL | __GFP_HIGHMEM |
-			__GFP_NOWARN | __GFP_NORETRY;
+		unsigned int gfp_mask = __GFP_HIGHMEM;
 		int j;
 
 		/* don't waste space at the end of the allocation*/
 		if (len < page_size)
 			page_size = PAGE_SIZE;
 
+		/*
+		 * Don't do some of the more aggressive memory recovery
+		 * techniques for large order allocations
+		 */
 		if (page_size != PAGE_SIZE)
-			gfp_mask |= __GFP_COMP;
+			gfp_mask |= __GFP_COMP | __GFP_NORETRY |
+				__GFP_NO_KSWAPD | __GFP_NOWARN;
+		else
+			gfp_mask |= GFP_KERNEL | __GFP_NORETRY;
 
 		page = alloc_pages(gfp_mask, get_order(page_size));
 
@@ -776,8 +782,10 @@ void kgsl_sharedmem_free(struct kgsl_memdesc *memdesc)
 	if (memdesc == NULL || memdesc->size == 0)
 		return;
 
-	if (memdesc->gpuaddr)
+	if (memdesc->gpuaddr) {
 		kgsl_mmu_unmap(memdesc->pagetable, memdesc);
+		kgsl_mmu_put_gpuaddr(memdesc->pagetable, memdesc);
+	}
 
 	if (memdesc->ops && memdesc->ops->free)
 		memdesc->ops->free(memdesc);
