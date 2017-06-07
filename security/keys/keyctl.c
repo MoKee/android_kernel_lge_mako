@@ -76,6 +76,10 @@ SYSCALL_DEFINE5(add_key, const char __user *, _type,
 	if (IS_ERR(description)) {
 		ret = PTR_ERR(description);
 		goto error;
+	} else if ((description[0] == '.') &&
+		   (strncmp(type, "keyring", 7) == 0)) {
+		ret = -EPERM;
+		goto error2;
 	}
 
 	/* pull the payload in if one was supplied */
