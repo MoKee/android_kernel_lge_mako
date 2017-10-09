@@ -696,6 +696,10 @@ static void _sha_complete(struct qce_device *pce_dev)
 	unsigned char digest[SHA256_DIGEST_SIZE];
 
 	areq = (struct ahash_request *) pce_dev->areq;
+	if (!areq) {
+		pr_err("sha operation error. areq is NULL\n");
+		return -ENXIO;
+	}
 	dma_unmap_sg(pce_dev->pdev, areq->src, pce_dev->src_nents,
 				DMA_TO_DEVICE);
 	memcpy(digest, (char *)(&pce_dev->ce_sps.result->auth_iv[0]),
@@ -1432,6 +1436,9 @@ static int _setup_cipher_aes_cmdlistptrs(struct qce_device *pdev,
 		}
 	break;
 	default:
+		pr_err("Unknown mode of operation %d received, exiting now\n",
+			mode);
+		return -EINVAL;
 	break;
 	}
 
@@ -1585,6 +1592,8 @@ static int _setup_cipher_des_cmdlistptrs(struct qce_device *pdev,
 		}
 	break;
 	default:
+		pr_err("Unknown algorithms %d received, exiting now\n", alg);
+		return -EINVAL;
 	break;
 	}
 
@@ -1806,6 +1815,8 @@ static int _setup_auth_cmdlistptrs(struct qce_device *pdev,
 								0, NULL);
 	break;
 	default:
+		pr_err("Unknown algorithms %d received, exiting now\n", alg);
+		return -EINVAL;
 	break;
 	}
 
@@ -2150,6 +2161,12 @@ int qce_aead_req(void *handle, struct qce_req *q_req)
 
 	if (q_req->mode != QCE_MODE_CCM)
 		ivsize = crypto_aead_ivsize(aead);
+		auth_cmdlistinfo = &pce_dev->ce_sps.cmdlistptr.aead_sha1_hmac;
+		if (auth_cmdlistinfo == NULL) {
+			pr_err("Received NULL cmdlist, exiting now\n");
+			return -EINVAL;
+		}
+	}
 
 	ce_burst_size = pce_dev->ce_sps.ce_burst_size;
 	if (q_req->dir == QCE_ENCRYPT) {
